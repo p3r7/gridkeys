@@ -1,9 +1,17 @@
 local mod = require 'core/mods'
 
+
+-- -------------------------------------------------------------------------
+-- STATE
+
 local state = {
   grid_device = nil,
   midi_in_devices = {},
 }
+
+
+-- -------------------------------------------------------------------------
+-- UTILS: MIDI IN
 
 local function midi_msg_to_virtual(msg)
   local data = midi.to_data(msg)
@@ -38,6 +46,10 @@ local function note_off(note_num)
   return midi_msg_to_virtual(msg)
 end
 
+
+-- -------------------------------------------------------------------------
+-- GRID EVENT
+
 local function grid_key(x, y, z)
   local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127)
 
@@ -60,6 +72,8 @@ local function grid_key(x, y, z)
 end
 
 
+-- -------------------------------------------------------------------------
+-- MAIN
 
 mod.hook.register("script_pre_init", "gridkeys", function()
                     state.grid_device = grid.connect(1)
