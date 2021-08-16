@@ -76,6 +76,17 @@ end
 -- MAIN
 
 mod.hook.register("script_pre_init", "gridkeys", function()
-                    state.grid_device = grid.connect(1)
-                    state.grid_device.key = grid_key
+                    local script_init = init
+                    init = function ()
+                      script_init()
+                      print("mod - gridkeys - init ")
+                      state.grid_device = grid.connect(1)
+                      print(state.grid_device.key)
+                      if state.grid_device.key ~= nil then
+                        print("mod - gridkeys - grid bound by script, do nothing")
+                      else
+                        print("mod - gridkeys - grid is free, use it")
+                        state.grid_device.key = grid_key
+                      end
+                    end
 end)
