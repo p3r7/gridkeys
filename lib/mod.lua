@@ -98,12 +98,12 @@ local function toggle_grid_key(status)
     -- print("RESTORE OG GRID KEY HANDLER")
 
     -- restore grid API
-    state.grid_device.all = clone_function(state.grid_device.og_all)
-    state.grid_device.intensity = clone_function(state.grid_device.og_intensity)
-    state.grid_device.led = clone_function(state.grid_device.og_led)
-    state.grid_device.refresh = clone_function(state.grid_device.og_refresh)
+    state.grid_device.all = state.grid_device.og_all
+    state.grid_device.intensity = state.grid_device.og_intensity
+    state.grid_device.led = state.grid_device.og_led
+    state.grid_device.refresh = state.grid_device.og_refresh
     -- restore og callback
-    state.grid_device.key = clone_function(state.grid_device.og_key)
+    state.grid_device.key = state.grid_device.og_key
   else
     -- print("ACTIVATE GRIDKEYS")
 
