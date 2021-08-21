@@ -34,7 +34,7 @@ end
 -- -------------------------------------------------------------------------
 -- UTILS: MIDI IN
 
-local function midi_msg_to_virtual(msg)
+local function send_midi_msg(msg)
   local data = midi.to_data(msg)
   local is_affecting = false
 
@@ -67,7 +67,7 @@ local function note_on(note_num, vel)
     vel = vel,
     ch = 1,
   }
-  return midi_msg_to_virtual(msg)
+  return send_midi_msg(msg)
 end
 
 local function note_off(note_num)
@@ -77,7 +77,7 @@ local function note_off(note_num)
     vel = 100,
     ch = 1,
   }
-  return midi_msg_to_virtual(msg)
+  return send_midi_msg(msg)
 end
 
 
