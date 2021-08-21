@@ -8,6 +8,7 @@ local state = {
   grid_device = nil,
   script_uses_grid = false,
   midi_in_devices = {},
+  midi_out_device = nil,
 }
 
 
@@ -35,15 +36,28 @@ end
 
 local function midi_msg_to_virtual(msg)
   local data = midi.to_data(msg)
-  for _, dev in pairs(midi.devices) do
-    if dev.port ~= nil and dev.name == 'virtual' then
-      if midi.vports[dev.port].event ~= nil then
-        midi.vports[dev.port].event(data)
-        return true
+  local is_affecting = false
+
+  -- midi in
+  if params:get("gridkeys_midi_mode") ~= 3 then
+    for _, dev in pairs(midi.devices) do
+      if dev.port ~= nil and dev.name == 'virtual' then
+        if midi.vports[dev.port].event ~= nil then
+          midi.vports[dev.port].event(data)
+        is_affecting = true
+        break
+        end
       end
     end
   end
-  return false
+
+  -- midi out
+  if params:get("gridkeys_midi_mode") ~= 1 and state.midi_out_device ~= nil then
+    state.midi_out_device:send(data)
+    is_affecting = true
+  end
+
+  return is_affecting
 end
 
 local function note_on(note_num, vel)
@@ -119,33 +133,76 @@ end
 -- -------------------------------------------------------------------------
 -- MAIN
 
+local function init_grid()
+  state.grid_device = grid.connect(1)
+
+  state.grid_device.og_all = clone_function(state.grid_device.all)
+  state.grid_device.og_intensity = clone_function(state.grid_device.intensity)
+  state.grid_device.og_led = clone_function(state.grid_device.led)
+  state.grid_device.og_refresh = clone_function(state.grid_device.refresh)
+
+  if state.grid_device.key ~= nil then
+    print("mod - gridkeys - grid bound by script")
+    state.grid_device.og_key = clone_function(state.grid_device.key)
+    state.script_uses_grid = true
+  else
+    toggle_grid_key(true)
+  end
+end
+
+local function init_params()
+  params:add_separator("MOD - GRIDKEYS")
+
+  params:add_option("gridkeys_active", "gridkeys active", {"off", "on"},
+                    state.script_uses_grid and 1 or 2)
+  params:set_action("gridkeys_active",
+                    function(v)
+                      toggle_grid_key(v ~= 2)
+  end)
+
+  params:add_option("gridkeys_midi_mode", "MIDI", {"in", "in+out", "out"})
+  params:set_action("gridkeys_midi_mode",
+                    function(v)
+                      if v == 3 then
+                        params:hide("gridkeys_midi_out_device")
+                      else
+                        params:show("gridkeys_midi_out_device")
+                      end
+  end)
+  params:add{type = "number", id = "gridkeys_midi_out_device", name = "MIDI OUT Device", min = 1, max = 4, default = 1, action = function(v)
+               local device = midi.connect(v)
+               if device.name == 'virtual' or device.name == "none" then
+                 state.midi_out_device = nil
+               end
+               state.midi_out_device = device
+  end}
+end
+
+-- mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
+--                     -- NB: dirty hack to wait for menu to be loaded
+--                     local function post_startup ()
+--                       print("!!!!!!!!!!!!!!!!!!!!!!!!!!!! 1")
+--                       clock.sleep(1/4)
+--                       print("mod - gridkeys - post startup init")
+--                       init_grid()
+--                       print("!!!!!!!!!!!!!!!!!!!!!!!!!!!! 2")
+--                       init_params()
+--                       print("!!!!!!!!!!!!!!!!!!!!!!!!!!!! 3")
+--                       params:set("gridkeys_midi_mode", 3)
+--                     end
+
+--                     clock.run(post_startup)
+
+-- end)
+
+
 mod.hook.register("script_pre_init", "gridkeys", function()
                     local script_init = init
                     init = function ()
                       script_init()
                       print("mod - gridkeys - init")
-                      state.grid_device = grid.connect(1)
-                      print(state.grid_device.key)
-                      if state.grid_device.key ~= nil then
-                        print("mod - gridkeys - grid bound by script")
-                        state.grid_device.og_key = clone_function(state.grid_device.key)
-                        state.script_uses_grid = true
-                      else
-                        toggle_grid_key(true)
-                      end
-
-                      state.grid_device.og_all = clone_function(state.grid_device.all)
-                      state.grid_device.og_intensity = clone_function(state.grid_device.intensity)
-                      state.grid_device.og_led = clone_function(state.grid_device.led)
-                      state.grid_device.og_refresh = clone_function(state.grid_device.refresh)
-
-                      if state.script_uses_grid then
-                        params:add_separator("MOD - GRIDKEYS")
-                        params:add_option("gridkeys_active", "gridkeys active", {"off", "on"}, 1)
-                        params:set_action("gridkeys_active",
-                                          function(x)
-                                            toggle_grid_key(x ~= 2)
-                        end)
-                      end
+                      init_grid()
+                      init_params()
+                      params:set("gridkeys_midi_mode", 1)
                     end
 end)
