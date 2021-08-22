@@ -181,8 +181,9 @@ local function init_params()
                local device = midi.connect(v)
                if device.name == 'virtual' or device.name == "none" then
                  state.midi_out_device = nil
+               else
+                 state.midi_out_device = device
                end
-               state.midi_out_device = device
   end}
 end
 
