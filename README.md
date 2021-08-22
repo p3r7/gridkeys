@@ -16,14 +16,14 @@ in `in` mode, notes will be sent to the input of the `virtual` midi device, whic
 
 ### gotchas
 
-in `in` mode, playing grid will only take effect if current script listen to the `virtual` midi device.
+in `in` mode, playing grid will only take effect if current script listens to the `virtual` midi device.
 
-in `out` mode, playing grid will only take effect if target device is other than `none` or `virtual`.
+in `out` mode, playing grid will only take effect if target device is other than `none` and `virtual`.
 
 
 ### future evolutions
 
-right now only molly-style layout is supported, something like gridstep's would be more versatile.
+right now only `molly_the_polly`-style layout is supported. something like gridstep's would be more versatile.
 
 
 ### example usage
