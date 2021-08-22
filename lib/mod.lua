@@ -36,6 +36,8 @@ local init_state = {
   script_uses_grid = false,
   midi_in_devices = {},
   midi_out_device = nil,
+
+  is_loading_script = nil,
 }
 
 local state = table.copy(init_state)
@@ -138,6 +140,14 @@ local function toggle_grid_key(status)
   end
 end
 
+--- restore grid API fns
+local function restore_grid_initial_state()
+  state.grid_device = grid.connect(1)
+  toggle_grid_key(false)
+  state.grid_device.key = nil
+  state = table.copy(init_state)
+end
+
 
 -- -------------------------------------------------------------------------
 -- MAIN
@@ -189,7 +199,7 @@ local function script_init_grid()
     toggle_grid_key(true)
   end
 
-  state.grid_device.is_loading_script = nil
+  state.is_loading_script = nil
 end
 
 --- when no script gets loaded, activate gridkeys
@@ -202,8 +212,7 @@ mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
 
                       script_clear()
 
-                      state.grid_device = grid.connect(1)
-                      local is_stop = (state.grid_device.is_loading_script == nil)
+                      local is_stop = (state.is_loading_script == nil)
 
                       if is_restart then
                         print("mod - gridkeys - clear at sys (re)start")
@@ -214,9 +223,7 @@ mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
                         print("mod - gridkeys - clear at script stop")
 
                         -- reset whatever got previously set
-                        toggle_grid_key(false)
-                        state.grid_device.key = nil
-                        state = table.copy(init_state)
+                        restore_grid_initial_state()
 
                         -- activate
                         startup_init_grid()
@@ -231,6 +238,7 @@ mod.hook.register("script_pre_init", "gridkeys", function()
                     local script_init = init
                     init = function ()
                       script_init()
+
                       print("mod - gridkeys - init")
                       script_init_grid()
                       init_params()
@@ -240,13 +248,9 @@ end)
 
 --- before any script load, restore grid API &
 --- NB: appears to get triggered BEFORE loading any script, even if no script previously loaded BUT NOT when stopping a script (!)
---- REVIEW: why not put this inside `script_pre_init`, just before call to `script_init`?
 --- we store current transition in grid (field `is_loading_script`) to
 mod.hook.register("script_post_cleanup", "gridkeys-cleanup", function()
                     print("mod - gridkeys - pre-loading cleanup")
-                    state.grid_device = grid.connect(1)
-                    toggle_grid_key(false)
-                    state.grid_device.key = nil
-                    state.grid_device.is_loading_script = true
-                    state = table.copy(init_state)
+                    restore_grid_initial_state()
+                    state.is_loading_script = true
 end)
