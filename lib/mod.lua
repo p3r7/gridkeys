@@ -2,18 +2,13 @@ local mod = require 'core/mods'
 
 
 -- -------------------------------------------------------------------------
--- STATE
-
-local state = {
-  grid_device = nil,
-  script_uses_grid = false,
-  midi_in_devices = {},
-  midi_out_device = nil,
-}
-
-
--- -------------------------------------------------------------------------
 -- UTILS: CORE
+
+function table.copy(t)
+  local u = { }
+  for k, v in pairs(t) do u[k] = v end
+  return setmetatable(u, getmetatable(t))
+end
 
 local function clone_function(fn)
   local dumped=string.dump(fn)
@@ -32,6 +27,19 @@ end
 
 
 -- -------------------------------------------------------------------------
+-- STATE
+
+local init_state = {
+  grid_device = nil,
+  script_uses_grid = false,
+  midi_in_devices = {},
+  midi_out_device = nil,
+}
+
+local state = table.copy(init_state)
+
+
+-- -------------------------------------------------------------------------
 -- UTILS: MIDI IN
 
 local function send_midi_msg(msg)
@@ -44,8 +52,8 @@ local function send_midi_msg(msg)
       if dev.port ~= nil and dev.name == 'virtual' then
         if midi.vports[dev.port].event ~= nil then
           midi.vports[dev.port].event(data)
-        is_affecting = true
-        break
+          is_affecting = true
+          break
         end
       end
     end
@@ -86,7 +94,6 @@ end
 
 local function grid_key(x, y, z)
   local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127)
-
   local midi_d_is_active = false
   if z == 1 then
     midi_d_is_active = note_on(note_num, 100)
@@ -108,7 +115,7 @@ end
 local function toggle_grid_key(status)
   state.grid_device.og_all(state.grid_device, 0)
   state.grid_device.og_refresh(state.grid_device)
-  if status == true then
+  if status == false then
     -- print("RESTORE OG GRID KEY HANDLER")
 
     -- restore grid API
@@ -142,10 +149,11 @@ local function init_grid()
   state.grid_device.og_refresh = clone_function(state.grid_device.refresh)
 
   if state.grid_device.key ~= nil then
-    print("mod - gridkeys - grid bound by script")
+    print("mod - gridkeys - OFF as grid bound by script")
     state.grid_device.og_key = clone_function(state.grid_device.key)
     state.script_uses_grid = true
   else
+    print("mod - gridkeys - ON as grid is free")
     toggle_grid_key(true)
   end
 end
@@ -157,7 +165,7 @@ local function init_params()
                     state.script_uses_grid and 1 or 2)
   params:set_action("gridkeys_active",
                     function(v)
-                      toggle_grid_key(v ~= 2)
+                      toggle_grid_key(v == 2)
   end)
 
   params:add_option("gridkeys_midi_mode", "MIDI", {"in", "in+out", "out"})
@@ -205,4 +213,9 @@ mod.hook.register("script_pre_init", "gridkeys", function()
                       init_params()
                       params:set("gridkeys_midi_mode", 1)
                     end
+end)
+
+mod.hook.register("script_post_cleanup", "gridkeys-cleanup", function()
+                    state.grid_device.key = nil
+                    state = table.copy(init_state)
 end)
