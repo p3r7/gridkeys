@@ -32,6 +32,7 @@ midi `out` mode allows to play grid as a midi keyboard, targeting external hardw
 
 midi `in` mode is ideal for synth scripts such as:
 - `icarus`
+- `mx.samples`
 - `lissadron` \*
 - `sines` \*
 
