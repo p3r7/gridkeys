@@ -221,7 +221,10 @@ mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
                         params:set("gridkeys_midi_mode", 3)
                       else
                         print("mod - gridkeys - clear at script start/stop")
-
+                        script_init_grid()
+                        init_params()
+                        update_midi_out_device_by_index(1)
+                        params:set("gridkeys_midi_mode", 3)
                       end
                     end
 end)
@@ -233,9 +236,6 @@ mod.hook.register("script_pre_init", "gridkeys", function()
                       script_init()
 
                       print("mod - gridkeys - init")
-                      script_init_grid()
-                      init_params()
-                      update_midi_out_device_by_index(1)
                       params:set("gridkeys_midi_mode", 1)
                     end
 end)
