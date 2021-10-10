@@ -36,6 +36,6 @@ midi `in` mode is ideal for synth scripts such as:
 - `lissadron` \*
 - `sines` \*
 
-\*: those script only listen for the first midi device, so you'd have to have `virtual` in first  position in your global midi config.
+\*: those script only listen for the first midi device, so you'd have to have `virtual` in first position in your global midi config.
 
 additionally, can be used in development phase to debug a supercollider engine.
