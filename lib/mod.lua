@@ -36,15 +36,13 @@ local init_state = {
   script_uses_grid = false,
   midi_in_devices = {},
   midi_out_device = nil,
-
-  is_loading_script = nil,
 }
 
 local state = table.copy(init_state)
 
 
 -- -------------------------------------------------------------------------
--- UTILS: MIDI IN
+-- UTILS: MIDI IN / OUT
 
 local function send_midi_msg(msg)
   local data = midi.to_data(msg)
@@ -90,6 +88,16 @@ local function note_off(note_num)
     ch = 1,
   }
   return send_midi_msg(msg)
+end
+
+local function update_midi_out_device_by_index(v)
+  local device = midi.connect(v)
+  print("mod - gridkeys - init_params - midi_out_device=" .. device.name)
+  if device.name == 'virtual' or device.name == "none" then
+    state.midi_out_device = nil
+  else
+    state.midi_out_device = device
+  end
 end
 
 
@@ -164,12 +172,7 @@ local function init_params()
 
   params:add_option("gridkeys_midi_mode", "MIDI", {"in", "in+out", "out"})
   params:add{type = "number", id = "gridkeys_midi_out_device", name = "MIDI OUT Device", min = 1, max = 4, default = 1, action = function(v)
-               local device = midi.connect(v)
-               if device.name == 'virtual' or device.name == "none" then
-                 state.midi_out_device = nil
-               else
-                 state.midi_out_device = device
-               end
+               update_midi_out_device_by_index(v)
   end}
 
   params:add_separator()
@@ -198,8 +201,6 @@ local function script_init_grid()
     print("mod - gridkeys - ON as grid is free")
     toggle_grid_key(true)
   end
-
-  state.is_loading_script = nil
 end
 
 --- when no script gets loaded, activate gridkeys
@@ -212,23 +213,15 @@ mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
 
                       script_clear()
 
-                      local is_stop = (state.is_loading_script == nil)
-
                       if is_restart then
-                        print("mod - gridkeys - clear at sys (re)start")
+                        print("mod - gridkeys - clear at (re)start")
                         startup_init_grid()
                         init_params()
+                        update_midi_out_device_by_index(1)
                         params:set("gridkeys_midi_mode", 3)
-                      elseif is_stop then
-                        print("mod - gridkeys - clear at script stop")
+                      else
+                        print("mod - gridkeys - clear at script start/stop")
 
-                        -- reset whatever got previously set
-                        restore_grid_initial_state()
-
-                        -- activate
-                        startup_init_grid()
-                        init_params()
-                        params:set("gridkeys_midi_mode", 3)
                       end
                     end
 end)
@@ -242,6 +235,7 @@ mod.hook.register("script_pre_init", "gridkeys", function()
                       print("mod - gridkeys - init")
                       script_init_grid()
                       init_params()
+                      update_midi_out_device_by_index(1)
                       params:set("gridkeys_midi_mode", 1)
                     end
 end)
@@ -251,6 +245,7 @@ end)
 --- we store current transition in grid (field `is_loading_script`) to
 mod.hook.register("script_post_cleanup", "gridkeys-cleanup", function()
                     print("mod - gridkeys - pre-loading cleanup")
-                    restore_grid_initial_state()
-                    state.is_loading_script = true
+                    if state.grid_device ~= nil then
+                      restore_grid_initial_state()
+                    end
 end)
