@@ -1,6 +1,7 @@
 local mod = require 'core/mods'
 local script = require 'core/script'
 local tabutil = require 'tabutil'
+local grid = util.file_exists(_path.code.."midigrid") and include "midigrid/lib/midigrid" or grid
 
 
 -- -------------------------------------------------------------------------
