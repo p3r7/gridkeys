@@ -93,7 +93,7 @@ end
 
 local function update_midi_out_device_by_index(v)
   local device = midi.connect(v)
-  print("mod - gridkeys - init_params - midi_out_device=" .. device.name)
+  -- print("mod - gridkeys - init_params - midi_out_device=" .. device.name)
   if device.name == 'virtual' or device.name == "none" then
     state.midi_out_device = nil
   else
@@ -126,26 +126,46 @@ local function grid_key(x, y, z)
 end
 
 local function toggle_grid_key(status)
+
+  local status_str = status and "true" or "false"
+  print("mod - gridkeys - TOGGLE_GRID_KEY = "..status_str)
+
+  if state.grid_device == nil then
+    print("mod - gridkeys - TOGGLE_GRID_KEY -> ABORT")
+    return
+  end
+
   state.grid_device.og_all(state.grid_device, 0)
   state.grid_device.og_refresh(state.grid_device)
   if status == false then
-    -- print("RESTORE OG GRID KEY HANDLER")
+    if state.grid_device.gridkeys_on == true then
+      -- print("RESTORE OG GRID KEY HANDLER")
 
-    -- restore grid API
-    state.grid_device.all = state.grid_device.og_all
-    state.grid_device.intensity = state.grid_device.og_intensity
-    state.grid_device.led = state.grid_device.og_led
-    state.grid_device.refresh = state.grid_device.og_refresh
-    -- restore og callback
-    state.grid_device.key = state.grid_device.og_key
+      -- restore grid API
+      state.grid_device.all = state.grid_device.og_all
+      state.grid_device.intensity = state.grid_device.og_intensity
+      state.grid_device.led = state.grid_device.og_led
+      state.grid_device.refresh = state.grid_device.og_refresh
+      -- restore og callback
+      state.grid_device.key = state.grid_device.og_key
+      state.grid_device.gridkeys_on = nil
+    else
+      print("mod - gridkeys - TOGGLE_GRID_KEY -> NO CHANGE")
+    end
   else
-    -- print("ACTIVATE GRIDKEYS")
+    if state.grid_device.gridkeys_on == nil then
 
-    state.grid_device.all = function(...) end
-    state.grid_device.intensity = function(...) end
-    state.grid_device.led = function(...) end
-    state.grid_device.refresh = function(...) end
-    state.grid_device.key = grid_key
+      -- print("ACTIVATE GRIDKEYS")
+
+      state.grid_device.all = function(...) end
+      state.grid_device.intensity = function(...) end
+      state.grid_device.led = function(...) end
+      state.grid_device.refresh = function(...) end
+      state.grid_device.key = grid_key
+      state.grid_device.gridkeys_on = true
+    else
+      print("mod - gridkeys - TOGGLE_GRID_KEY -> NO CHANGE")
+    end
   end
 end
 
@@ -155,6 +175,7 @@ local function restore_grid_initial_state()
   toggle_grid_key(false)
   state.grid_device.key = nil
   state = table.copy(init_state)
+  -- print("mod - gridkeys - UNSET KEY() !!!!!")
 end
 
 
@@ -194,6 +215,8 @@ end
 local function script_init_grid()
   state.grid_device = grid.connect(1)
 
+  -- print("mod - gridkeys - TESTING KEY() !!!!!")
+
   if state.grid_device.key ~= nil then
     print("mod - gridkeys - OFF as grid bound by script")
     state.grid_device.og_key = clone_function(state.grid_device.key)
@@ -206,11 +229,15 @@ end
 
 --- when no script gets loaded, activate gridkeys
 --- this happens on system (re)start and script stop
-mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
+mod.hook.register("system_post_startup", "gridkeys-sys-post-startup", function ()
                     local script_clear = script.clear
                     script.clear = function()
 
                       local is_restart = (tabutil.count(params.lookup) == 0)
+
+                      -- if state.grid_device ~= nil then
+                      --   restore_grid_initial_state()
+                      -- end
 
                       script_clear()
 
@@ -221,32 +248,43 @@ mod.hook.register("system_post_startup", "gridkeys-sys-startup", function ()
                         update_midi_out_device_by_index(1)
                         params:set("gridkeys_midi_mode", 3)
                       else
-                        print("mod - gridkeys - clear at script start/stop")
-                        script_init_grid()
+                        print("mod - gridkeys - clear at script stop / pre-start")
+                        -- script_init_grid()
+                        state.grid_device = grid.connect(1)
                         init_params()
                         update_midi_out_device_by_index(1)
                         params:set("gridkeys_midi_mode", 3)
+                        params:set('gridkeys_active', 2)
+                        -- params:bang()
                       end
                     end
 end)
 
 --- on script load, conditionally activate gridkeys
-mod.hook.register("script_pre_init", "gridkeys", function()
+mod.hook.register("script_pre_init", "gridkeys-script-pre-init", function()
                     local script_init = init
                     init = function ()
+
+                      if state.grid_device ~= nil then
+                        params:set('gridkeys_active', 1)
+                      end
+
+                      print("mod - gridkeys - script init")
                       script_init()
 
-                      print("mod - gridkeys - init")
+                      print("mod - gridkeys - mod init")
+                      script_init_grid()
+                      params:set('gridkeys_active', (state.script_uses_grid and 1 or 2))
                       params:set("gridkeys_midi_mode", 1)
                     end
 end)
 
 --- before any script load, restore grid API &
---- NB: appears to get triggered BEFORE loading any script, even if no script previously loaded BUT NOT when stopping a script (!)
---- we store current transition in grid (field `is_loading_script`) to
-mod.hook.register("script_post_cleanup", "gridkeys-cleanup", function()
-                    print("mod - gridkeys - pre-loading cleanup")
+--- NB: appears to get triggered BEFORE loading any script, even if no script previously loaded + when stopping a script (before a `script.clear`)
+mod.hook.register("script_post_cleanup", "gridkeys-script-post-cleanup", function()
+                    print("mod - gridkeys - script post cleanup")
                     if state.grid_device ~= nil then
                       restore_grid_initial_state()
+                      -- params:set("gridkeys_midi_mode", 3)
                     end
 end)
