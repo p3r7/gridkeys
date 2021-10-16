@@ -109,7 +109,7 @@ local function grid_key(x, y, z)
   local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127)
   local midi_d_is_active = false
   if z == 1 then
-    midi_d_is_active = note_on(note_num, 100)
+    midi_d_is_active = note_on(note_num, params:get("gridkeys_velocity"))
     if midi_d_is_active then
       state.grid_device.og_led(state.grid_device, x, y, 15)
     end
@@ -196,6 +196,7 @@ local function init_params()
   params:add{type = "number", id = "gridkeys_midi_out_device", name = "MIDI OUT Device", min = 1, max = 4, default = 1, action = function(v)
                update_midi_out_device_by_index(v)
   end}
+  params:add{type = "number", id = "gridkeys_velocity", name = "Velocity", min = 1, max = 127, default = 100}
 
   params:add_separator()
 end
