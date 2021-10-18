@@ -448,7 +448,7 @@ local function init_params()
     params:hide("gridkeys_q7_layout")
     params:hide("gridkeys_q7_scale")
     params:hide("gridkeys_q7_root_note")
-    _menu.rebuild_params()
+    -- _menu.rebuild_params()
   end
 end
 
