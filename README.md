@@ -1,9 +1,10 @@
 # gridkeys
 
-mod for monome norns, use grid as midi keyboard anywhere.
+mod for _monome norns_, use grid as midi keyboard anywhere.
 
 can send midi message towards currently running script (`in`), external hadware (`out`) or both at the same time (`in+out`).
 
+additionally, can target [_crow_](https://monome.org/docs/crow/) `1+2` CV ports and [_Just Friends_](https://norns.community/en/script-connectivity/jf) through _crow_ via _ii_.
 
 ### usage
 
@@ -25,7 +26,7 @@ in `out` mode, playing grid will only take effect if target device is other than
 
 when doing a manual stop (either though maiden'd stop button or with the `K1` held + `K3` key combo in the 3rd screen of the global menu), gridkeys will fail to activate.
 
-when norns previous script at boot (after a sleep), gridstep will also fail to activate.
+when _norns_ loads previous script at boot (after a sleep), gridstep will also fail to activate.
 
 in both scenarios, going to the params menu, and switching grikeys off then back on will force it to activate.
 
