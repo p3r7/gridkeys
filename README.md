@@ -21,9 +21,13 @@ in `in` mode, playing grid will only take effect if current script listens to th
 in `out` mode, playing grid will only take effect if target device is other than `none` and `virtual`.
 
 
-### future evolutions
+### known issues
 
-right now only `molly_the_polly`-style layout is supported. something like gridstep's would be more versatile.
+when doing a manual stop (either though maiden'd stop button or with the `K1` held + `K3` key combo in the 3rd screen of the global menu), gridkeys will fail to activate.
+
+when norns previous script at boot (after a sleep), gridstep will also fail to activate.
+
+in both scenarios, going to the params menu, and switching grikeys off then back on will force it to activate.
 
 
 ### example usage
