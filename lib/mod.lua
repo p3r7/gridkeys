@@ -56,10 +56,28 @@ local active_midi_notes = {}
 
 
 -- -------------------------------------------------------------------------
+-- UTILS: CROW CV OUT
+
+local function crow_cv_note(note_num)
+  crow.output[1].volts = (note_num - 60) / 12
+  crow.output[2].execute()
+end
+
+
+-- -------------------------------------------------------------------------
+-- UTILS: CROW ii JF OUT
+
+local function crow_jf_note(note_num)
+  crow.ii.jf.play_note((note_num-60)/12,5)
+end
+
+
+-- -------------------------------------------------------------------------
 -- UTILS: MIDI IN / OUT
 
 local function send_midi_msg(msg)
   local data = midi.to_data(msg)
+  local is_note_on = (msg.type == 'note_on')
   local is_affecting = false
 
   -- midi in
@@ -80,6 +98,18 @@ local function send_midi_msg(msg)
     msg.ch = params:get("gridkeys_midi_out_channel")
     data = midi.to_data(msg)
     state.midi_out_device:send(data)
+    is_affecting = true
+  end
+
+  -- crow CV out
+  if is_note_on and params:string('gridkeys_crow_out') == 'on' then
+    crow_cv_note(msg.note)
+    is_affecting = true
+  end
+
+  -- crow ii JF out
+  if is_note_on and params:string('gridkeys_jf_out') == 'on' then
+    crow_jf_note(msg.note)
     is_affecting = true
   end
 
@@ -379,6 +409,26 @@ local function init_params()
                       all_midi_notes_off()
   end)
 
+
+  params:add_option("gridkeys_crow_out", "crow 1+2 out", {"off", "on"})
+  params:set_action("gridkeys_crow_out",
+                    function(v)
+                      if v == 2 then
+                        crow.output[2].action = "{to(5,0),to(0,0.25)}"
+                      end
+  end)
+
+  params:add_option("gridkeys_jf_out", "crow ii jf out", {"off", "on"})
+  params:set_action("gridkeys_jf_out",
+                    function(v)
+                      if v == 2 then
+                        crow.ii.pullup(true)
+                        crow.ii.jf.mode(1)
+                      else
+                        crow.ii.jf.mode(0)
+                      end
+  end)
+
   params:add{type = "number", id = "gridkeys_velocity", name = "Velocity", min = 1, max = 127, default = 100}
 
   params:add_option("gridkeys_mode", "Mode", gridkeys_modes, default_mode)
@@ -537,5 +587,9 @@ mod.hook.register("script_post_cleanup", "gridkeys-script-post-cleanup", functio
                     if state.grid_device ~= nil then
                       restore_grid_initial_state()
                       -- params:set("gridkeys_midi_mode", 3)
+
+                      if params:string("gridkeys_jf_out") == "on" then
+                        crow.ii.jf.mode(0)
+                      end
                     end
 end)
