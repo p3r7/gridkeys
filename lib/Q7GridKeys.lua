@@ -565,15 +565,19 @@ function Q7GridKeys:is_note_in_scale(noteNum)
     end
 end
 
-function Q7GridKeys:draw_grid(grid)
+function Q7GridKeys:draw_grid(grid, are_note_presses_affecting)
 
-    local xOff = self.grid_x - 1
-    local yOff = self.grid_y - 1
+  local xOff = self.grid_x - 1
+  local yOff = self.grid_y - 1
 
-    for x = 1,self.grid_width do
-        for y = 1,self.grid_height do
-            local noteNum = self:grid_to_note(x,y)
-            if noteNum ~= nil then
+  if are_note_presses_affecting == nil then
+    are_note_presses_affecting = true
+  end
+
+  for x = 1,self.grid_width do
+    for y = 1,self.grid_height do
+      local noteNum = self:grid_to_note(x,y)
+      if noteNum ~= nil then
 
                 local id = self:get_key_id(x,y)
 
@@ -597,7 +601,7 @@ function Q7GridKeys:draw_grid(grid)
 
                     local animOff = self.anim_keys[x][y]
 
-                    if self.selected_keys[x][y] == 1 then
+                    if are_note_presses_affecting and self.selected_keys[x][y] == 1 then
                       grid.og_led(grid, x + xOff, y + yOff, 15)
                     elseif noteName == music.NOTE_NAMES[self.root_note] then
                       local i = 6 + selectedOff + animOff
@@ -624,7 +628,7 @@ function Q7GridKeys:draw_grid(grid)
 
                     local animOff = self.anim_keys[x][y]
 
-                    if self.selected_keys[x][y] == 1 then
+                    if are_note_presses_affecting and self.selected_keys[x][y] == 1 then
                       grid.og_led(grid, x + xOff, y + yOff, 15)
                     elseif animOff >= 1 or selectedOff >=1 then
                       grid.og_led(grid, x + xOff, y + yOff, 2 + selectedOff + animOff)

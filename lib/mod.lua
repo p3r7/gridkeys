@@ -173,6 +173,7 @@ local gridType_64 = 2
 local gridType = 1
 local gridNbLevels = 15
 
+local q7_is_is_affecting = false
 
 local function init_q7gridkeys()
 
@@ -213,19 +214,17 @@ local function q7grid_redraw()
     toolbar_btn_brightness = 15
   end
 
-  q7gridkeys:draw_grid(state.grid_device)
+  q7gridkeys:draw_grid(state.grid_device, q7_is_is_affecting)
 
-  state.grid_device.og_led(state.grid_device, state.grid_device.cols - 1, state.grid_device.rows, toolbar_btn_brightness) -- grid down
-  state.grid_device.og_led(state.grid_device, state.grid_device.cols, state.grid_device.rows, toolbar_btn_brightness) -- grid up
+  -- toolbar
+  state.grid_device.og_led(state.grid_device, state.grid_device.cols - 1, state.grid_device.rows, toolbar_btn_brightness) -- down
+  state.grid_device.og_led(state.grid_device, state.grid_device.cols, state.grid_device.rows, toolbar_btn_brightness) -- up
 
   state.grid_device.og_refresh(state.grid_device)
 end
 
 local function q7grid_key(x, y, z)
   -- NB: see `GridPlay.grid_key`
-
-  local midi_d_is_active = true
-
 
   if y == 8 and ((gridType == gridType_128 and x == 15) or (gridType == gridType_64 and x == 7)) then
     all_midi_notes_off()
@@ -237,17 +236,15 @@ local function q7grid_key(x, y, z)
     q7gridkeys:grid_key(x,y,z)
   end
 
-  -- if midi_d_is_active then
   q7grid_redraw()
   state.grid_device.og_refresh(state.grid_device)
-  -- end
-  end
+end
 
-  function q7grid_note_on(gKeys, noteNum, vel)
-    -- print("Note On: " .. noteNum.. " " .. vel .. " " .. music.note_num_to_name(noteNum))
+function q7grid_note_on(gKeys, noteNum, vel)
+  -- print("Note On: " .. noteNum.. " " .. vel .. " " .. music.note_num_to_name(noteNum))
 
   if gKeys.sound_mode == 2 then -- midi out
-    note_on(noteNum, params:get("gridkeys_velocity"))
+    q7_is_is_affecting = note_on(noteNum, params:get("gridkeys_velocity"))
   end
 end
 
