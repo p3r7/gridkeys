@@ -1,5 +1,7 @@
 # gridkeys
 
+<div align=center><img src="https://norns.community/community/eigen/grids.jpg" width="500"></div>
+
 mod for _monome norns_, use grid as midi keyboard anywhere.
 
 can send midi message towards currently running script (`in`), external hadware (`out`) or both at the same time (`in+out`).
