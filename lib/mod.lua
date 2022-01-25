@@ -503,7 +503,12 @@ local function startup_init_grid()
   state.grid_device = grid.connect(1)
 
   state.grid_device.og_all = clone_function(state.grid_device.all)
-  state.grid_device.og_intensity = clone_function(state.grid_device.intensity)
+  -- NB: workaround for midigrid
+  if state.grid_device.intensity ~= nil then
+    state.grid_device.og_intensity = clone_function(state.grid_device.intensity)
+  else
+    state.grid_device.og_intensity = function(...) end
+  end
   state.grid_device.og_led = clone_function(state.grid_device.led)
   state.grid_device.og_refresh = clone_function(state.grid_device.refresh)
 
