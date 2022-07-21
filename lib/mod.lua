@@ -54,6 +54,13 @@ local active_root_note = 1
 
 local active_midi_notes = {}
 
+local function is_gridkeys_on()
+  if state.grid_device.gridkeys_on == true then
+    return true
+  end
+  return false
+end
+
 
 -- -------------------------------------------------------------------------
 -- UTILS: CROW CV OUT
@@ -324,13 +331,12 @@ end
 -- -------------------------------------------------------------------------
 -- STATE MANAGEMENT
 
-local function toggle_grid_key(status)
-
+local function set_gridkeys(status)
   local status_str = status and "true" or "false"
-  print("mod - gridkeys - TOGGLE_GRID_KEY = "..status_str)
+  print("mod - gridkeys - SET_GRIDKEYS = "..status_str)
 
   if state.grid_device == nil then
-    print("mod - gridkeys - TOGGLE_GRID_KEY -> ABORT")
+    print("mod - gridkeys - SET_GRIDKEYS -> ABORT")
     return
   end
 
@@ -338,7 +344,7 @@ local function toggle_grid_key(status)
   state.grid_device.og_refresh(state.grid_device)
 
   if status == false then
-    if state.grid_device.gridkeys_on == true then
+    if is_gridkeys_on() then
       -- print("RESTORE OG GRID KEY HANDLER")
 
       -- restore grid API
@@ -350,10 +356,10 @@ local function toggle_grid_key(status)
       state.grid_device.key = state.grid_device.og_key
       state.grid_device.gridkeys_on = nil
     else
-      print("mod - gridkeys - TOGGLE_GRID_KEY -> NO CHANGE")
+      print("mod - gridkeys - SET_GRIDKEYS -> NO CHANGE")
     end
   else
-    if state.grid_device.gridkeys_on == nil then
+    if not is_gridkeys_on() then
 
       -- print("ACTIVATE GRIDKEYS")
 
@@ -369,15 +375,23 @@ local function toggle_grid_key(status)
         q7grid_redraw()
       end
     else
-        print("mod - gridkeys - TOGGLE_GRID_KEY -> NO CHANGE")
+      print("mod - gridkeys - SET_GRIDKEYS -> NO CHANGE")
     end
   end
+end
+
+local function enable_gridkeys()
+  set_gridkeys(true)
+end
+
+local function disable_gridkeys()
+  set_gridkeys(false)
 end
 
 --- restore grid API fns
 local function restore_grid_initial_state()
   state.grid_device = grid.connect(1)
-  toggle_grid_key(false)
+  disable_gridkeys()
   state.grid_device.key = nil
   state = table.copy(init_state)
   -- print("mod - gridkeys - UNSET KEY() !!!!!")
@@ -394,7 +408,7 @@ local function init_params()
                     state.script_uses_grid and 1 or 2)
   params:set_action("gridkeys_active",
                     function(v)
-                      toggle_grid_key(v == 2)
+                      set_gridkeys(v == 2)
   end)
 
   params:add_option("gridkeys_midi_mode", "MIDI", {"in", "in+out", "out"})
@@ -437,13 +451,17 @@ local function init_params()
                       active_mode = gridkeys_modes[v]
                       all_midi_notes_off()
                       if active_mode == 'basic' then
-                        state.grid_device.og_all(state.grid_device, 0)
-                        state.grid_device.og_refresh(state.grid_device)
+                        if is_gridkeys_on() then
+                          state.grid_device.og_all(state.grid_device, 0)
+                          state.grid_device.og_refresh(state.grid_device)
+                        end
                         params:hide("gridkeys_q7_layout")
                         params:hide("gridkeys_q7_scale")
                         params:hide("gridkeys_q7_root_note")
                       else
-                        q7grid_redraw()
+                        if is_gridkeys_on() then
+                          q7grid_redraw()
+                        end
                         params:show("gridkeys_q7_layout")
                         params:show("gridkeys_q7_scale")
                         params:show("gridkeys_q7_root_note")
@@ -514,7 +532,7 @@ local function startup_init_grid()
 
   init_q7gridkeys()
 
-  toggle_grid_key(true)
+  enable_gridkeys()
 end
 
 
@@ -529,7 +547,7 @@ local function script_init_grid()
     state.script_uses_grid = true
   else
     print("mod - gridkeys - ON as grid is free")
-    toggle_grid_key(true)
+    enable_gridkeys()
   end
 end
 
