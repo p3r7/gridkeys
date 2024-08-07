@@ -507,7 +507,6 @@ local function init_params()
                       end
   end)
 
-  params:add_separator()
 
   if gridkeys_modes[default_mode] ~= 'q7' then
     params:hide("gridkeys_q7_layout")
