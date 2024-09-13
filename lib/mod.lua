@@ -3,7 +3,11 @@ local script = require 'core/script'
 local tabutil = require 'tabutil'
 local music = require 'musicutil'
 
+local nb = include("gridkeys/lib/nb/lib/nb")
+
 local grid = util.file_exists(_path.code.."midigrid") and include "midigrid/lib/midigrid" or grid
+
+local midiutils = include("gridkeys/lib/midiutils")
 local grid_utils = require 'gridkeys/lib/grid_utils'
 local Q7GridKeys = require 'gridkeys/lib/Q7GridKeys'
 
@@ -32,144 +36,34 @@ local function clone_function(fn)
   return cloned
 end
 
+local function bool_as_str(v)
+  return v and "true" or "false"
+end
+
 
 -- -------------------------------------------------------------------------
 -- STATE
 
-local init_state = {
-  grid_device = nil,
-  script_uses_grid = false,
-  midi_in_devices = {},
-  midi_out_device = nil,
-}
-
-local state = table.copy(init_state)
-
 local gridkeys_modes = {'basic', 'q7'}
-local default_mode = 1
-local active_mode = gridkeys_modes[default_mode]
+  local default_mode = 2
 
-local active_scale = 1
-local active_root_note = 1
+  local init_state = {
+    grid_device = nil,
+    script_uses_grid = false,
+    midi_in_devices = {},
+    midi_out_device = nil,
 
-local active_midi_notes = {}
-
-local function is_gridkeys_on()
-  if state.grid_device.gridkeys_on == true then
-    return true
-  end
-  return false
-end
-
-
--- -------------------------------------------------------------------------
--- UTILS: CROW CV OUT
-
-local function crow_cv_note(note_num)
-  crow.output[1].volts = (note_num - 60) / 12
-  crow.output[2].execute()
-end
-
-
--- -------------------------------------------------------------------------
--- UTILS: CROW ii JF OUT
-
-local function crow_jf_note(note_num)
-  crow.ii.jf.play_note((note_num-60)/12,5)
-end
-
-
--- -------------------------------------------------------------------------
--- UTILS: MIDI IN / OUT
-
-local function send_midi_msg(msg)
-  local data = midi.to_data(msg)
-  local is_note_on = (msg.type == 'note_on')
-  local is_affecting = false
-
-  -- midi in
-  if params:get("gridkeys_midi_mode") ~= 3 then
-    for _, dev in pairs(midi.devices) do
-      if dev.port ~= nil and dev.name == 'virtual' then
-        if midi.vports[dev.port].event ~= nil then
-          midi.vports[dev.port].event(data)
-          is_affecting = true
-          break
-        end
-      end
-    end
-  end
-
-  -- midi out
-  if params:get("gridkeys_midi_mode") ~= 1 and state.midi_out_device ~= nil then
-    msg.ch = params:get("gridkeys_midi_out_channel")
-    data = midi.to_data(msg)
-    state.midi_out_device:send(data)
-    is_affecting = true
-  end
-
-  -- crow CV out
-  if is_note_on and params:string('gridkeys_crow_out') == 'on' then
-    crow_cv_note(msg.note)
-    is_affecting = true
-  end
-
-  -- crow ii JF out
-  if is_note_on and params:string('gridkeys_jf_out') == 'on' then
-    crow_jf_note(msg.note)
-    is_affecting = true
-  end
-
-  return is_affecting
-end
-
-local function note_on(note_num, vel, chan)
-  chan = chan or 1
-  local msg = {
-    type = 'note_on',
-    note = note_num,
-    vel = vel,
-    ch = chan,
+    active_notes = {},
   }
 
-  if active_midi_notes[note_num] == nil then
-    active_midi_notes[note_num] = true
+  GRIDKEYS_STATE = table.copy(init_state)
+
+  local function is_gridkeys_on()
+  if not GRIDKEYS_STATE.grid_device then
+    return false
   end
 
-  return send_midi_msg(msg)
-end
-
-local function note_off(note_num, chan)
-  chan = chan or 1
-  local msg = {
-    type = 'note_off',
-    note = note_num,
-    vel = 100,
-    ch = chan,
-  }
-
-  active_midi_notes[note_num] = nil
-
-  return send_midi_msg(msg)
-end
-
-function all_midi_notes_off()
-  for note_num, v in pairs(active_midi_notes) do
-    if v == true then
-      note_off(note_num, chan)
-    end
-  end
-end
-
-
-local function update_midi_out_device_by_index(v)
-  local device = midi.connect(v)
-  -- print("mod - gridkeys - init_params - midi_out_device=" .. device.name)
-  if device.name == 'virtual' or device.name == "none" then
-    state.midi_out_device = nil
-  else
-    state.midi_out_device = device
-  end
+  return ( GRIDKEYS_STATE.grid_device.gridkeys_on == true )
 end
 
 
@@ -180,19 +74,19 @@ local function basic_grid_key(x, y, z)
   local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127)
   local midi_d_is_active = false
   if z == 1 then
-    midi_d_is_active = note_on(note_num, params:get("gridkeys_velocity"))
+    midi_d_is_active = midiutils.note_on(GRIDKEYS_STATE, note_num, params:get("gridkeys_velocity"), params:get("gridkeys_midi_virtual_channel"))
     if midi_d_is_active then
-      state.grid_device.og_led(state.grid_device, x, y, 15)
+      GRIDKEYS_STATE.grid_device.og_led(GRIDKEYS_STATE.grid_device, x, y, 15)
     end
   else
-    midi_d_is_active = note_off(note_num)
+    midi_d_is_active = midiutils.note_off(GRIDKEYS_STATE, note_num, params:get("gridkeys_midi_virtual_channel"))
     if midi_d_is_active then
-      state.grid_device.og_led(state.grid_device, x, y, 0)
+      GRIDKEYS_STATE.grid_device.og_led(GRIDKEYS_STATE.grid_device, x, y, 0)
     end
   end
 
   if midi_d_is_active then
-    state.grid_device.og_refresh(state.grid_device)
+    GRIDKEYS_STATE.grid_device.og_refresh(GRIDKEYS_STATE.grid_device)
   end
 end
 
@@ -213,17 +107,20 @@ local gridNbLevels = 15
 local q7_is_is_affecting = false
 
 local function init_q7gridkeys()
-
-  if state.grid_device.cols == 16 and state.grid_device.rows == 8 then
-    print("grid 128 detected")
-    gridType = gridType_128
-  elseif state.grid_device.cols == 8 and state.grid_device.rows == 8 then
-    print("grid 64 detected")
-    gridType = gridType_64
-  else
+  if not GRIDKEYS_STATE.grid_device then
     gridType = gridType_none
+  else
+    if GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 8 then
+      print("grid 128 detected")
+      gridType = gridType_128
+    elseif GRIDKEYS_STATE.grid_device.cols == 8 and GRIDKEYS_STATE.grid_device.rows == 8 then
+      print("grid 64 detected")
+      gridType = gridType_64
+    else
+      gridType = gridType_none
+    end
+    GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
   end
-  state.grid_device.nb_levels = grid_utils.nb_levels(state.grid_device)
 
   q7gridkeys = Q7GridKeys.new(16,8)
   q7gridkeys.id = 1
@@ -242,46 +139,46 @@ end
 local function q7grid_redraw()
   -- NB: see `GridPlay.grid_redraw`
 
-  state.grid_device.og_all(state.grid_device, 0)
+  GRIDKEYS_STATE.grid_device.og_all(GRIDKEYS_STATE.grid_device, 0)
 
-  state.grid_device.nb_levels = grid_utils.nb_levels(state.grid_device)
+  GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
 
   local toolbar_btn_brightness = 6
-  if state.grid_device.nb_levels == 1 then
+  if GRIDKEYS_STATE.grid_device.nb_levels == 1 then
     toolbar_btn_brightness = 15
   end
 
-  q7gridkeys:draw_grid(state.grid_device, q7_is_is_affecting)
+  q7gridkeys:draw_grid(GRIDKEYS_STATE.grid_device, q7_is_is_affecting)
 
   -- toolbar
-  state.grid_device.og_led(state.grid_device, state.grid_device.cols - 1, state.grid_device.rows, toolbar_btn_brightness) -- down
-  state.grid_device.og_led(state.grid_device, state.grid_device.cols, state.grid_device.rows, toolbar_btn_brightness) -- up
+  GRIDKEYS_STATE.grid_device.og_led(GRIDKEYS_STATE.grid_device, GRIDKEYS_STATE.grid_device.cols - 1, GRIDKEYS_STATE.grid_device.rows, toolbar_btn_brightness) -- down
+  GRIDKEYS_STATE.grid_device.og_led(GRIDKEYS_STATE.grid_device, GRIDKEYS_STATE.grid_device.cols, GRIDKEYS_STATE.grid_device.rows, toolbar_btn_brightness) -- up
 
-  state.grid_device.og_refresh(state.grid_device)
+  GRIDKEYS_STATE.grid_device.og_refresh(GRIDKEYS_STATE.grid_device)
 end
 
 local function q7grid_key(x, y, z)
   -- NB: see `GridPlay.grid_key`
 
   if y == 8 and ((gridType == gridType_128 and x == 15) or (gridType == gridType_64 and x == 7)) then
-    all_midi_notes_off()
+    midiutils.all_midi_notes_off(GRIDKEYS_STATE)
     q7gridkeys:scroll_down()
   elseif y == 8 and ((gridType == gridType_128 and x == 16) or (gridType == gridType_64 and x == 8)) then
-    all_midi_notes_off()
+    midiutils.all_midi_notes_off(GRIDKEYS_STATE)
     q7gridkeys:scroll_up()
   else
     q7gridkeys:grid_key(x,y,z)
   end
 
   q7grid_redraw()
-  state.grid_device.og_refresh(state.grid_device)
+  GRIDKEYS_STATE.grid_device.og_refresh(GRIDKEYS_STATE.grid_device)
 end
 
 function q7grid_note_on(gKeys, noteNum, vel)
   -- print("Note On: " .. noteNum.. " " .. vel .. " " .. music.note_num_to_name(noteNum))
 
   if gKeys.sound_mode == 2 then -- midi out
-    q7_is_is_affecting = note_on(noteNum, params:get("gridkeys_velocity"))
+    q7_is_is_affecting = midiutils.note_on(GRIDKEYS_STATE, noteNum, params:get("gridkeys_velocity"), params:get("gridkeys_midi_virtual_channel"))
   end
 end
 
@@ -289,7 +186,7 @@ function q7grid_note_off(gKeys, noteNum)
   -- print("Note Off: " .. noteNum .. " " .. music.note_num_to_name(noteNum))
 
   if gKeys.sound_mode == 2 then
-    note_off(noteNum)
+    midiutils.note_off(GRIDKEYS_STATE, noteNum, params:get("gridkeys_midi_virtual_channel"))
   end
 end
 
@@ -320,7 +217,7 @@ end
 -- GRID KEY CB
 
 local function grid_key(x, y, z)
-  if active_mode == 'basic' then
+  if params:string("gridkeys_mode") == 'basic' then
     basic_grid_key(x, y, z)
   else
     q7grid_key(x, y, z)
@@ -331,47 +228,85 @@ end
 -- -------------------------------------------------------------------------
 -- STATE MANAGEMENT
 
-local function set_gridkeys(status)
-  local status_str = status and "true" or "false"
-  print("mod - gridkeys - SET_GRIDKEYS = "..status_str)
+local function save_og_grid_fns(g)
+  g.og_all = clone_function(g.all)
+  if g.intensity ~= nil then
+    g.og_intensity = clone_function(g.intensity)
+  else
+    -- NB: workaround for `midigrid`
+    g.og_intensity = function(...) end
+  end
 
-  if state.grid_device == nil then
-    print("mod - gridkeys - SET_GRIDKEYS -> ABORT")
+  g.og_led = clone_function(g.led)
+  g.og_refresh = clone_function(g.refresh)
+end
+
+local function remove_snapshoted_grid_fns(g)
+  -- methods
+  g.og_all = nil
+  g.og_intensity = nil
+  g.og_led = nil
+  g.og_refresh = nil
+
+  -- callbacks
+  g.og_key = nil
+end
+
+local function restore_og_grid_fns(g)
+  if not g.og_all then
     return
   end
 
-  state.grid_device.og_all(state.grid_device, 0)
-  state.grid_device.og_refresh(state.grid_device)
+  -- methods
+  g.all = g.og_all
+  g.intensity = g.og_intensity
+  g.led = g.og_led
+  g.refresh = g.og_refresh
+
+  -- callbacks
+  g.key = g.og_key
+end
+
+
+local function gridkeys_takeover(g)
+  g.all = function(...) end
+  g.intensity = function(...) end
+  g.led = function(...) end
+  g.refresh = function(...) end
+
+  g.key = grid_key
+  -- g.key = basic_grid_key
+
+  g.gridkeys_on = true
+end
+
+local function set_gridkeys(status)
+  print("mod - gridkeys - SET_GRIDKEYS = "..bool_as_str(status))
+
+  if not GRIDKEYS_STATE.grid_device  then
+    print("mod - gridkeys - SET_GRIDKEYS - no grid -> ABORT")
+    return
+  end
+
+  GRIDKEYS_STATE.grid_device.og_all(GRIDKEYS_STATE.grid_device, 0)
+  GRIDKEYS_STATE.grid_device.og_refresh(GRIDKEYS_STATE.grid_device)
 
   if status == false then
     if is_gridkeys_on() then
-      -- print("RESTORE OG GRID KEY HANDLER")
+      restore_og_grid_fns(GRIDKEYS_STATE.grid_device)
 
-      -- restore grid API
-      state.grid_device.all = state.grid_device.og_all
-      state.grid_device.intensity = state.grid_device.og_intensity
-      state.grid_device.led = state.grid_device.og_led
-      state.grid_device.refresh = state.grid_device.og_refresh
-      -- restore og callback
-      state.grid_device.key = state.grid_device.og_key
-      state.grid_device.gridkeys_on = nil
+      GRIDKEYS_STATE.grid_device.gridkeys_on = nil
     else
       print("mod - gridkeys - SET_GRIDKEYS -> NO CHANGE")
     end
   else
     if not is_gridkeys_on() then
-
       -- print("ACTIVATE GRIDKEYS")
+      gridkeys_takeover(GRIDKEYS_STATE.grid_device)
 
-      state.grid_device.all = function(...) end
-      state.grid_device.intensity = function(...) end
-      state.grid_device.led = function(...) end
-      state.grid_device.refresh = function(...) end
-      state.grid_device.key = grid_key
-      -- state.grid_device.key = basic_grid_key
-      state.grid_device.gridkeys_on = true
+      GRIDKEYS_STATE.grid_device.gridkeys_on = true
 
-      if active_mode == 'q7' then
+      if params:string("gridkeys_mode") == 'q7' then
         q7grid_redraw()
       end
     else
@@ -390,9 +325,9 @@ end
 
 --- restore grid API fns
 local function restore_grid_initial_state()
-  state.grid_device = grid.connect(1)
+  GRIDKEYS_STATE.grid_device = grid.connect(1)
   disable_gridkeys()
-  state.grid_device.key = nil
+  GRIDKEYS_STATE.grid_device.key = nil
   state = table.copy(init_state)
   -- print("mod - gridkeys - UNSET KEY() !!!!!")
 end
@@ -404,56 +339,48 @@ end
 local function init_params()
   params:add_separator("MOD - GRIDKEYS")
 
-  params:add_option("gridkeys_active", "gridkeys active", {"off", "on"},
-                    state.script_uses_grid and 1 or 2)
+  local OFF_ON = {"off", "on"}
+  local ON_OFF = {"on", "off"}
+  params:add_option("gridkeys_active", "gridkeys active", OFF_ON,
+                    GRIDKEYS_STATE.script_uses_grid and tab.key(OFF_ON, "off") or tab.key(OFF_ON, "on"))
   params:set_action("gridkeys_active",
                     function(v)
-                      set_gridkeys(v == 2)
+                      set_gridkeys(OFF_ON[v] == "on")
   end)
 
-  params:add_option("gridkeys_midi_mode", "MIDI", {"in", "in+out", "out"})
-  params:add{type = "number", id = "gridkeys_midi_out_device", name = "MIDI Out Device", min = 1, max = 4, default = 1, action = function(v)
-               all_midi_notes_off()
-               update_midi_out_device_by_index(v)
-  end}
-
-  params:add{type = "number", id = "gridkeys_midi_out_channel", name = "MIDI Out Channel", min = 1, max = 16, default = 1}
-  params:set_action("gridkeys_midi_out_channel",
+  params:add_option("gridkeys_midi_virtual", "midi virtual", ON_OFF)
+  params:set_action("gridkeys_midi_virtual",
                     function(v)
-                      all_midi_notes_off()
-  end)
+                      midiutils.all_midi_notes_off(GRIDKEYS_STATE)
 
-
-  params:add_option("gridkeys_crow_out", "crow 1+2 out", {"off", "on"})
-  params:set_action("gridkeys_crow_out",
-                    function(v)
-                      if v == 2 then
-                        crow.output[2].action = "{to(5,0),to(0,0.25)}"
-                      end
-  end)
-
-  params:add_option("gridkeys_jf_out", "crow ii jf out", {"off", "on"})
-  params:set_action("gridkeys_jf_out",
-                    function(v)
-                      if v == 2 then
-                        crow.ii.pullup(true)
-                        crow.ii.jf.mode(1)
+                      if ON_OFF[v] == "on" then
+                        params:show("gridkeys_midi_virtual_channel")
                       else
-                        crow.ii.jf.mode(0)
+                        params:hide("gridkeys_midi_virtual_channel")
                       end
+                      _menu.rebuild_params()
   end)
+
+  params:add{type = "number", id = "gridkeys_midi_virtual_channel", name = "MIDI Out Channel", min = 1, max = 16, default = 1}
+  params:set_action("gridkeys_midi_virtual_channel",
+                    function(v)
+                      midiutils.all_midi_notes_off(GRIDKEYS_STATE)
+  end)
+
+  nb:add_param("gridkeys_nb_voice", "nb Voice")
 
   params:add{type = "number", id = "gridkeys_velocity", name = "Velocity", min = 1, max = 127, default = 100}
 
   params:add_option("gridkeys_mode", "Mode", gridkeys_modes, default_mode)
   params:set_action("gridkeys_mode",
                     function(v)
-                      active_mode = gridkeys_modes[v]
-                      all_midi_notes_off()
-                      if active_mode == 'basic' then
+                      local prev_mode = params:string("gridkeys_mode")
+
+                      midiutils.all_midi_notes_off(GRIDKEYS_STATE)
+                      if prev_mode == 'basic' then
                         if is_gridkeys_on() then
-                          state.grid_device.og_all(state.grid_device, 0)
-                          state.grid_device.og_refresh(state.grid_device)
+                          GRIDKEYS_STATE.grid_device.og_all(GRIDKEYS_STATE.grid_device, 0)
+                          GRIDKEYS_STATE.grid_device.og_refresh(GRIDKEYS_STATE.grid_device)
                         end
                         params:hide("gridkeys_q7_layout")
                         params:hide("gridkeys_q7_scale")
@@ -474,24 +401,23 @@ local function init_params()
                     function(v)
                       q7gridkeys.layout_mode = v
                       change_q7gridkeys_layout()
-                      if active_mode == "q7" then
-                        all_midi_notes_off()
+                      if params:string("gridkeys_mode") == "q7" then
+                        midiutils.all_midi_notes_off(GRIDKEYS_STATE)
                         q7grid_redraw()
                       end
   end)
 
   local scale_names = {}
-  for  _, scale in pairs(music.SCALES) do
+  for _, scale in pairs(music.SCALES) do
     table.insert(scale_names, scale.name)
   end
 
   params:add_option("gridkeys_q7_scale", "Q7 scale", scale_names)
   params:set_action("gridkeys_q7_scale",
                     function(v)
-                      active_scale = v
-                      q7gridkeys:change_scale(active_root_note, active_scale)
-                      if active_mode == "q7" then
-                        all_midi_notes_off()
+                      q7gridkeys:change_scale(params:get("gridkeys_q7_root_note"), v)
+                      if params:string("gridkeys_mode") == "q7" then
+                        midiutils.all_midi_notes_off(GRIDKEYS_STATE)
                         q7grid_redraw()
                       end
   end)
@@ -499,15 +425,12 @@ local function init_params()
   params:add_option("gridkeys_q7_root_note", "Q7 root note", music.NOTE_NAMES)
   params:set_action("gridkeys_q7_root_note",
                     function(v)
-                      active_root_note = v
-                      q7gridkeys:change_scale(active_root_note, active_scale)
-                      if active_mode == "q7" then
-                        all_midi_notes_off()
+                      q7gridkeys:change_scale(v, params:get("gridkeys_q7_scale"))
+                      if params:string("gridkeys_mode") == "q7" then
+                        midiutils.all_midi_notes_off(GRIDKEYS_STATE)
                         q7grid_redraw()
                       end
   end)
-
-  params:add_separator()
 
   if gridkeys_modes[default_mode] ~= 'q7' then
     params:hide("gridkeys_q7_layout")
@@ -515,104 +438,66 @@ local function init_params()
     params:hide("gridkeys_q7_root_note")
     -- _menu.rebuild_params()
   end
+
+  -- TODO: conditionally add those if script not using nb
+  nb:add_player_params()
 end
 
-local function startup_init_grid()
-  state.grid_device = grid.connect(1)
 
-  state.grid_device.og_all = clone_function(state.grid_device.all)
-  -- NB: workaround for midigrid
-  if state.grid_device.intensity ~= nil then
-    state.grid_device.og_intensity = clone_function(state.grid_device.intensity)
-  else
-    state.grid_device.og_intensity = function(...) end
-  end
-  state.grid_device.og_led = clone_function(state.grid_device.led)
-  state.grid_device.og_refresh = clone_function(state.grid_device.refresh)
-
-  init_q7gridkeys()
-
-  enable_gridkeys()
-end
-
+-- -------------------------------------------------------------------------
+-- mod lifecycle - init
 
 local function script_init_grid()
-  state.grid_device = grid.connect(1)
+  local i = 1
+  local g = grid.connect(i)
 
-  -- print("mod - gridkeys - TESTING KEY() !!!!!")
+  if not g or g.name == "none" then
+    print("mod - gridkeys - no grid detected at position "..i)
+    return
+  end
 
-  if state.grid_device.key ~= nil then
+  GRIDKEYS_STATE.grid_device = g
+  save_og_grid_fns(GRIDKEYS_STATE.grid_device)
+
+  if GRIDKEYS_STATE.grid_device.key ~= nil then
     print("mod - gridkeys - OFF as grid bound by script")
-    state.grid_device.og_key = clone_function(state.grid_device.key)
-    state.script_uses_grid = true
+    GRIDKEYS_STATE.grid_device.og_key = clone_function(GRIDKEYS_STATE.grid_device.key)
+    GRIDKEYS_STATE.script_uses_grid = true
   else
     print("mod - gridkeys - ON as grid is free")
     enable_gridkeys()
   end
 end
 
---- when no script gets loaded, activate gridkeys
---- this happens on system (re)start and script stop
-mod.hook.register("system_post_startup", "gridkeys-sys-post-startup", function ()
-                    local script_clear = script.clear
-                    script.clear = function()
 
-                      local is_restart = (tabutil.count(params.lookup) == 0)
-
-                      -- if state.grid_device ~= nil then
-                      --   restore_grid_initial_state()
-                      -- end
-
-                      script_clear()
-
-                      if is_restart then
-                        print("mod - gridkeys - clear at (re)start")
-                        startup_init_grid()
-                        init_params()
-                        update_midi_out_device_by_index(1)
-                        params:set("gridkeys_midi_mode", 3)
-                      else
-                        print("mod - gridkeys - clear at script stop / pre-start")
-                        -- script_init_grid()
-                        state.grid_device = grid.connect(1)
-                        init_params()
-                        update_midi_out_device_by_index(1)
-                        params:set("gridkeys_midi_mode", 3)
-                        params:set('gridkeys_active', 2)
-                        -- params:bang()
-                      end
-                    end
-end)
+-- -------------------------------------------------------------------------
+-- mod lifecycle - hooks
 
 --- on script load, conditionally activate gridkeys
-mod.hook.register("script_pre_init", "gridkeys-script-pre-init", function()
-                    local script_init = init
-                    init = function ()
+mod.hook.register("script_post_init", "gridkeys-script-post-init", function()
+                    print("mod - gridkeys - mod init")
 
-                      if state.grid_device ~= nil then
-                        params:set('gridkeys_active', 1)
-                      end
+                    nb.voice_count = 1
+                    nb:init()
 
-                      print("mod - gridkeys - script init")
-                      script_init()
+                    init_params()
+                    GRIDKEYS_STATE.grid_device = grid.connect(1)
+                    init_q7gridkeys()
 
-                      print("mod - gridkeys - mod init")
-                      script_init_grid()
-                      params:set('gridkeys_active', (state.script_uses_grid and 1 or 2))
-                      params:set("gridkeys_midi_mode", 1)
-                    end
+                    script_init_grid()
+
+                    params:set('gridkeys_active', (GRIDKEYS_STATE.script_uses_grid and 1 or 2))
 end)
 
 --- before any script load, restore grid API &
 --- NB: appears to get triggered BEFORE loading any script, even if no script previously loaded + when stopping a script (before a `script.clear`)
 mod.hook.register("script_post_cleanup", "gridkeys-script-post-cleanup", function()
                     print("mod - gridkeys - script post cleanup")
-                    if state.grid_device ~= nil then
-                      restore_grid_initial_state()
-                      -- params:set("gridkeys_midi_mode", 3)
-
-                      if params:string("gridkeys_jf_out") == "on" then
-                        crow.ii.jf.mode(0)
+                    for i=1,16 do
+                      local g = grid.connect(i)
+                      if g then
+                        restore_og_grid_fns(g)
+                        remove_snapshoted_grid_fns(g)
                       end
                     end
 end)
