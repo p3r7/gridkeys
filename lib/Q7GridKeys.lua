@@ -166,10 +166,10 @@ function Q7GridKeys:resize_grid(x,y,width,height)
     -- create_kit_notes()
 end
 
-function Q7GridKeys:change_scale(new_root_note, new_scale_mode)
+function Q7GridKeys:change_scale(new_root_note, new_scale_mode, new_root_octave)
     self.root_note = new_root_note
     self.scale_mode = new_scale_mode
-    self.scale = music.generate_scale_of_length(self.root_note - 1,music.SCALES[self.scale_mode].name,127) -- 60 = C3
+    self.scale = music.generate_scale_of_length(self.root_note - 1 + (new_root_octave*12),music.SCALES[self.scale_mode].name,127) -- 60 = C3
     self.note_in_scale = {}
 
     for i=1,127 do
