@@ -96,7 +96,7 @@ function Q7GridKeys.new(width,height)
 
     -- gk.note_in_scale = {}
     gk:resize_grid(gk.grid_x,gk.grid_y ,gk.grid_width,gk.grid_height)
-    gk:change_scale(1, 1)
+    gk:change_scale(1, 1, 1)
     gk:create_kit_notes()
     return gk
 end
