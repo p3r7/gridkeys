@@ -415,7 +415,7 @@ local function init_params()
   params:add_option("gridkeys_q7_scale", "Q7 scale", scale_names)
   params:set_action("gridkeys_q7_scale",
                     function(v)
-                      q7gridkeys:change_scale(params:get("gridkeys_q7_root_note"), v)
+                      q7gridkeys:change_scale(params:get("gridkeys_q7_root_note"), v, params:get("gridkeys_q7_root_octave"))
                       if params:string("gridkeys_mode") == "q7" then
                         midiutils.all_midi_notes_off(GRIDKEYS_STATE)
                         q7grid_redraw()
@@ -425,12 +425,22 @@ local function init_params()
   params:add_option("gridkeys_q7_root_note", "Q7 root note", music.NOTE_NAMES)
   params:set_action("gridkeys_q7_root_note",
                     function(v)
-                      q7gridkeys:change_scale(v, params:get("gridkeys_q7_scale"))
+                      q7gridkeys:change_scale(v, params:get("gridkeys_q7_scale"), params:get("gridkeys_q7_root_octave"))
                       if params:string("gridkeys_mode") == "q7" then
                         midiutils.all_midi_notes_off(GRIDKEYS_STATE)
                         q7grid_redraw()
                       end
-  end)
+                    end)
+  params:add_option("gridkeys_q7_root_octave", "Q7 root octave", {1,2,3,4,5,6,7,8})
+  params:set_action("gridkeys_q7_root_octave",
+                    function(v)
+                      q7gridkeys:change_scale(params:get("gridkeys_q7_root_note"), params:get("gridkeys_q7_scale"), v)
+                      if params:string("gridkeys_mode") == "q7" then
+                        midiutils.all_midi_notes_off(GRIDKEYS_STATE)
+                        q7grid_redraw()
+                      end
+                    end)
+
 
   if gridkeys_modes[default_mode] ~= 'q7' then
     params:hide("gridkeys_q7_layout")
@@ -448,7 +458,7 @@ end
 -- mod lifecycle - init
 
 local function script_init_grid()
-  local i = 1
+  local i = 2
   local g = grid.connect(i)
 
   if not g or g.name == "none" then
