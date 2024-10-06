@@ -112,7 +112,7 @@ local function init_q7gridkeys()
     gridType = gridType_none
   else
     if GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 16 then
-      print("grid 128 detected")
+      print("grid 256 detected")
       gridType = gridType_256
     elseif GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 8 then
         print("grid 128 detected")
