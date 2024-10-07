@@ -101,6 +101,7 @@ local q7gridkeys_default_layout_mode = 2
 local gridType_none = 0
 local gridType_128 = 1
 local gridType_64 = 2
+local gridType_256 = 3
 local gridType = 1
 local gridNbLevels = 15
 
@@ -110,9 +111,12 @@ local function init_q7gridkeys()
   if not GRIDKEYS_STATE.grid_device then
     gridType = gridType_none
   else
-    if GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 8 then
-      print("grid 128 detected")
-      gridType = gridType_128
+    if GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 16 then
+      print("grid 256 detected")
+      gridType = gridType_256
+    elseif GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 8 then
+        print("grid 128 detected")
+        gridType = gridType_128
     elseif GRIDKEYS_STATE.grid_device.cols == 8 and GRIDKEYS_STATE.grid_device.rows == 8 then
       print("grid 64 detected")
       gridType = gridType_64
@@ -122,7 +126,7 @@ local function init_q7gridkeys()
     GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
   end
 
-  q7gridkeys = Q7GridKeys.new(16,8)
+  q7gridkeys = Q7GridKeys.new(GRIDKEYS_STATE.grid_device.cols,GRIDKEYS_STATE.grid_device.rows)
   q7gridkeys.id = 1
   q7gridkeys.midi_device = 1
   q7gridkeys.midi_channel = 1 -- unused
@@ -160,12 +164,16 @@ end
 local function q7grid_key(x, y, z)
   -- NB: see `GridPlay.grid_key`
 
-  if y == 8 and ((gridType == gridType_128 and x == 15) or (gridType == gridType_64 and x == 7)) then
+  if y == GRIDKEYS_STATE.grid_device.rows and ((gridType == gridType_128 or gridType == gridType_256 and x == (GRIDKEYS_STATE.grid_device.cols - 1)) or (gridType == gridType_64 and x == (GRIDKEYS_STATE.grid_device.cols - 1))) then
+    if (z == 1) then
     midiutils.all_midi_notes_off(GRIDKEYS_STATE)
     q7gridkeys:scroll_down()
-  elseif y == 8 and ((gridType == gridType_128 and x == 16) or (gridType == gridType_64 and x == 8)) then
+    end
+  elseif y == GRIDKEYS_STATE.grid_device.rows and ((gridType == gridType_128 or gridType == gridType_256 and x == GRIDKEYS_STATE.grid_device.cols) or (gridType == gridType_64 and x == GRIDKEYS_STATE.grid_device.cols)) then
+    if (z == 1) then
     midiutils.all_midi_notes_off(GRIDKEYS_STATE)
     q7gridkeys:scroll_up()
+    end
   else
     q7gridkeys:grid_key(x,y,z)
   end
