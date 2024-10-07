@@ -164,12 +164,12 @@ end
 local function q7grid_key(x, y, z)
   -- NB: see `GridPlay.grid_key`
 
-  if y == GRIDKEYS_STATE.grid_device.rows and ((gridType == gridType_128 or gridType == gridType_256 and x == (GRIDKEYS_STATE.grid_device.cols - 1)) or (gridType == gridType_64 and x == (GRIDKEYS_STATE.grid_device.cols - 1))) then
+  if y == GRIDKEYS_STATE.grid_device.rows and x == GRIDKEYS_STATE.grid_device.cols - 1 then
     if (z == 1) then
     midiutils.all_midi_notes_off(GRIDKEYS_STATE)
     q7gridkeys:scroll_down()
     end
-  elseif y == GRIDKEYS_STATE.grid_device.rows and ((gridType == gridType_128 or gridType == gridType_256 and x == GRIDKEYS_STATE.grid_device.cols) or (gridType == gridType_64 and x == GRIDKEYS_STATE.grid_device.cols)) then
+  elseif y == GRIDKEYS_STATE.grid_device.rows and x == GRIDKEYS_STATE.grid_device.cols then
     if (z == 1) then
     midiutils.all_midi_notes_off(GRIDKEYS_STATE)
     q7gridkeys:scroll_up()
