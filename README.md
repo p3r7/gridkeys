@@ -1,6 +1,6 @@
 # gridkeys
 
-<div align=center><img src="https://norns.community/community/eigen/grids.jpg" width="750"></div>
+<div align=center><img src="./gridkeys.jpg" width="750"></div>
 
 mod for _monome norns_, use grid as midi keyboard anywhere.
 
