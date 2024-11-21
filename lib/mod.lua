@@ -345,7 +345,7 @@ end
 -- MAIN
 
 local function init_params()
-  params:add_separator("MOD - GRIDKEYS")
+  params:add_separator("mod_gridkeys", "gridkeys")
 
   local OFF_ON = {"off", "on"}
   local ON_OFF = {"on", "off"}
