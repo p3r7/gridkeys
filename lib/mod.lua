@@ -490,6 +490,7 @@ mod.hook.register("script_post_init", "gridkeys-script-post-init", function()
 
                     init_params()
                     GRIDKEYS_STATE.grid_device = grid.connect(1)
+                    GRIDKEYS_STATE.grid_device.gridkeys_on = nil
                     init_q7gridkeys()
 
                     script_init_grid()
