@@ -507,6 +507,7 @@ mod.hook.register("script_post_cleanup", "gridkeys-script-post-cleanup", functio
                       if g then
                         restore_og_grid_fns(g)
                         remove_snapshoted_grid_fns(g)
+                        GRIDKEYS_STATE.grid_device.gridkeys_on = nil
                       end
                     end
 end)
