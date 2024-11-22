@@ -13,7 +13,7 @@ local Q7GridKeys = require 'gridkeys/lib/Q7GridKeys'
 
 
 -- -------------------------------------------------------------------------
--- UTILS: CORE
+-- utils: core
 
 function table.copy(t)
   local u = { }
@@ -42,23 +42,23 @@ end
 
 
 -- -------------------------------------------------------------------------
--- STATE
+-- state
 
 local gridkeys_modes = {'basic', 'q7'}
-  local default_mode = 2
+local default_mode = 2
 
-  local init_state = {
-    grid_device = nil,
-    script_uses_grid = false,
-    midi_in_devices = {},
-    midi_out_device = nil,
+local init_state = {
+  grid_device = nil,
+  script_uses_grid = false,
+  midi_in_devices = {},
+  midi_out_device = nil,
 
-    active_notes = {},
-  }
+  active_notes = {},
+}
 
-  GRIDKEYS_STATE = table.copy(init_state)
+GRIDKEYS_STATE = table.copy(init_state)
 
-  local function is_gridkeys_on()
+local function is_gridkeys_on()
   if not GRIDKEYS_STATE.grid_device then
     return false
   end
@@ -68,7 +68,7 @@ end
 
 
 -- -------------------------------------------------------------------------
--- GRID KEY CB - BASIC
+-- grid key cb - basic
 
 local function basic_grid_key(x, y, z)
   local note_num = util.clamp(((7 - y) * 5) + x + 33, 0, 127)
@@ -92,52 +92,31 @@ end
 
 
 -- -------------------------------------------------------------------------
--- GRID KEY CB - Q7
+-- grid key cb - q7
 
 local q7gridkeys
 
 local q7gridkeys_default_layout_mode = 2
 
-local gridType_none = 0
-local gridType_128 = 1
-local gridType_64 = 2
-local gridType_256 = 3
-local gridType = 1
 local gridNbLevels = 15
 
-local q7_is_is_affecting = false
+local q7_is_affecting = false
 
 local function init_q7gridkeys()
-  if not GRIDKEYS_STATE.grid_device then
-    gridType = gridType_none
-  else
-    if GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 16 then
-      print("grid 256 detected")
-      gridType = gridType_256
-    elseif GRIDKEYS_STATE.grid_device.cols == 16 and GRIDKEYS_STATE.grid_device.rows == 8 then
-        print("grid 128 detected")
-        gridType = gridType_128
-    elseif GRIDKEYS_STATE.grid_device.cols == 8 and GRIDKEYS_STATE.grid_device.rows == 8 then
-      print("grid 64 detected")
-      gridType = gridType_64
-    else
-      gridType = gridType_none
-    end
     GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
-  end
 
-  q7gridkeys = Q7GridKeys.new(GRIDKEYS_STATE.grid_device.cols,GRIDKEYS_STATE.grid_device.rows)
-  q7gridkeys.id = 1
-  q7gridkeys.midi_device = 1
-  q7gridkeys.midi_channel = 1 -- unused
-  q7gridkeys.sound_mode = 2 -- MIDI
-  q7gridkeys.note_on = q7grid_note_on
-  q7gridkeys.note_off = q7grid_note_off
-  q7gridkeys.key_pushed = q7grid_key_pushed
-  q7gridkeys.layout_mode = q7gridkeys_default_layout_mode
-  -- all_gridSeqs[i] = Q7GridSeq.new(q7gridkeys)
-  -- q7gridkeys.gridSeq = all_gridSeqs[i]
-  -- all_gridSeqs[i].on_pat_changed = gridSeq_pat_changed
+    q7gridkeys = Q7GridKeys.new(GRIDKEYS_STATE.grid_device.cols,GRIDKEYS_STATE.grid_device.rows)
+    q7gridkeys.id = 1
+    q7gridkeys.midi_device = 1
+    q7gridkeys.midi_channel = 1 -- unused
+    q7gridkeys.sound_mode = 2 -- MIDI
+    q7gridkeys.note_on = q7grid_note_on
+    q7gridkeys.note_off = q7grid_note_off
+    q7gridkeys.key_pushed = q7grid_key_pushed
+    q7gridkeys.layout_mode = q7gridkeys_default_layout_mode
+    -- all_gridSeqs[i] = Q7GridSeq.new(q7gridkeys)
+    -- q7gridkeys.gridSeq = all_gridSeqs[i]
+    -- all_gridSeqs[i].on_pat_changed = gridSeq_pat_changed
 end
 
 local function q7grid_redraw()
@@ -145,14 +124,14 @@ local function q7grid_redraw()
 
   GRIDKEYS_STATE.grid_device.og_all(GRIDKEYS_STATE.grid_device, 0)
 
-  GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
+  -- GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
 
   local toolbar_btn_brightness = 6
   if GRIDKEYS_STATE.grid_device.nb_levels == 1 then
     toolbar_btn_brightness = 15
   end
 
-  q7gridkeys:draw_grid(GRIDKEYS_STATE.grid_device, q7_is_is_affecting)
+  q7gridkeys:draw_grid(GRIDKEYS_STATE.grid_device, q7_is_affecting)
 
   -- toolbar
   GRIDKEYS_STATE.grid_device.og_led(GRIDKEYS_STATE.grid_device, GRIDKEYS_STATE.grid_device.cols - 1, GRIDKEYS_STATE.grid_device.rows, toolbar_btn_brightness) -- down
@@ -186,7 +165,7 @@ function q7grid_note_on(gKeys, noteNum, vel)
   -- print("Note On: " .. noteNum.. " " .. vel .. " " .. music.note_num_to_name(noteNum))
 
   if gKeys.sound_mode == 2 then -- midi out
-    q7_is_is_affecting = midiutils.note_on(GRIDKEYS_STATE, noteNum, params:get("gridkeys_velocity"), params:get("gridkeys_midi_virtual_channel"))
+    q7_is_affecting = midiutils.note_on(GRIDKEYS_STATE, noteNum, params:get("gridkeys_velocity"), params:get("gridkeys_midi_virtual_channel"))
   end
 end
 
@@ -222,7 +201,7 @@ end
 
 
 -- -------------------------------------------------------------------------
--- GRID KEY CB
+-- grid key cb
 
 local function grid_key(x, y, z)
   if params:string("gridkeys_mode") == 'basic' then
@@ -234,9 +213,10 @@ end
 
 
 -- -------------------------------------------------------------------------
--- STATE MANAGEMENT
+-- state - grid fns
 
-local function save_og_grid_fns(g)
+local function snapshot_og_grid_fns(g)
+  -- methods
   g.og_all = clone_function(g.all)
   if g.intensity ~= nil then
     g.og_intensity = clone_function(g.intensity)
@@ -244,7 +224,6 @@ local function save_og_grid_fns(g)
     -- NB: workaround for `midigrid`
     g.og_intensity = function(...) end
   end
-
   g.og_led = clone_function(g.led)
   g.og_refresh = clone_function(g.refresh)
 end
@@ -275,7 +254,6 @@ local function restore_og_grid_fns(g)
   g.key = g.og_key
 end
 
-
 local function gridkeys_takeover(g)
   g.all = function(...) end
   g.intensity = function(...) end
@@ -283,15 +261,18 @@ local function gridkeys_takeover(g)
   g.refresh = function(...) end
 
   g.key = grid_key
-  -- g.key = basic_grid_key
 
   g.gridkeys_on = true
 end
 
+
+-- -------------------------------------------------------------------------
+-- state - grid fns
+
 local function set_gridkeys(status)
   print("mod - gridkeys - SET_GRIDKEYS = "..bool_as_str(status))
 
-  if not GRIDKEYS_STATE.grid_device  then
+  if not grid_utils.valid(GRIDKEYS_STATE.grid_device) then
     print("mod - gridkeys - SET_GRIDKEYS - no grid -> ABORT")
     return
   end
@@ -331,18 +312,24 @@ local function disable_gridkeys()
   set_gridkeys(false)
 end
 
---- restore grid API fns
-local function restore_grid_initial_state()
-  GRIDKEYS_STATE.grid_device = grid.connect(1)
-  disable_gridkeys()
-  GRIDKEYS_STATE.grid_device.key = nil
-  state = table.copy(init_state)
-  -- print("mod - gridkeys - UNSET KEY() !!!!!")
+local function associate_grid(g)
+  if grid_utils.valid(g) then
+    g.nb_levels = grid_utils.nb_levels(g)
+    q7gridkeys.grid_width = g.cols
+    q7gridkeys.grid_height = g.rows
+    snapshot_og_grid_fns(g)
+  end
+end
+
+local function unassociate_grid(g)
+  restore_og_grid_fns(g)
+  remove_snapshoted_grid_fns(g)
+  g.gridkeys_on = nil
 end
 
 
 -- -------------------------------------------------------------------------
--- MAIN
+-- main
 
 local function init_params()
   params:add_separator("mod_gridkeys", "gridkeys")
@@ -354,6 +341,23 @@ local function init_params()
   params:set_action("gridkeys_active",
                     function(v)
                       set_gridkeys(OFF_ON[v] == "on")
+  end)
+
+  params:add{ type = "number", id = "gridkeys_grid", name = "grid", min = 1, max = 4, default = 1,
+              formatter = function(param)
+                local v = param:get()
+                return grid_utils.shortname(grid.connect(v)) .. " - " .. v
+  end}
+  params:set_action("gridkeys_grid",
+                    function(v)
+                      if GRIDKEYS_STATE.grid_device then
+                        disable_gridkeys()
+                        unassociate_grid(GRIDKEYS_STATE.grid_device)
+                      end
+                      midiutils.all_midi_notes_off(GRIDKEYS_STATE)
+                      GRIDKEYS_STATE.grid_device = grid.connect(v)
+                      associate_grid(GRIDKEYS_STATE.grid_device)
+                      set_gridkeys(params:string("gridkeys_active") == "on")
   end)
 
   params:add_option("gridkeys_midi_virtual", "midi virtual", ON_OFF)
@@ -459,13 +463,14 @@ local function script_init_grid()
   local i = 1
   local g = grid.connect(i)
 
-  if not g or g.name == "none" then
+  GRIDKEYS_STATE.grid_device = g
+
+  if not grid_utils.valid(g) then
     print("mod - gridkeys - no grid detected at position "..i)
     return
   end
 
-  GRIDKEYS_STATE.grid_device = g
-  save_og_grid_fns(GRIDKEYS_STATE.grid_device)
+  snapshot_og_grid_fns(GRIDKEYS_STATE.grid_device)
 
   if GRIDKEYS_STATE.grid_device.key ~= nil then
     print("mod - gridkeys - OFF as grid bound by script")
@@ -489,7 +494,7 @@ mod.hook.register("script_post_init", "gridkeys-script-post-init", function()
                     nb:init()
 
                     init_params()
-                    GRIDKEYS_STATE.grid_device = grid.connect(1)
+                    GRIDKEYS_STATE.grid_device = grid.connect(params:get("gridkeys_grid"))
                     GRIDKEYS_STATE.grid_device.gridkeys_on = nil
                     init_q7gridkeys()
 
@@ -505,9 +510,8 @@ mod.hook.register("script_post_cleanup", "gridkeys-script-post-cleanup", functio
                     for i=1,16 do
                       local g = grid.connect(i)
                       if g then
-                        restore_og_grid_fns(g)
-                        remove_snapshoted_grid_fns(g)
-                        g.gridkeys_on = nil
+                        unassociate_grid(g)
                       end
                     end
+                    state = table.copy(init_state)
 end)
