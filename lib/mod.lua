@@ -1,21 +1,29 @@
+
+local MOD_NAME = 'gridkeys'
+
 local mod = require 'core/mods'
 local script = require 'core/script'
 local tabutil = require 'tabutil'
 local music = require 'musicutil'
 
-local nb = include("gridkeys/lib/nb/lib/nb")
-
+local nb         = include(MOD_NAME .. "/lib/nb/lib/nb")
 local grid = util.file_exists(_path.code.."midigrid") and include "midigrid/lib/midigrid" or grid
-
-local midiutils = include("gridkeys/lib/midiutils")
-local grid_utils = require 'gridkeys/lib/grid_utils'
-local Q7GridKeys = require 'gridkeys/lib/Q7GridKeys'
+local midiutils  = include(MOD_NAME .. "/lib/midiutils")
+local grid_utils = require(MOD_NAME .. '/lib/grid_utils')
+local Q7GridKeys = require(MOD_NAME .. '/lib/Q7GridKeys')
 
 
 -- -------------------------------------------------------------------------
 -- utils: core
 
-function table.copy(t)
+local function tab_save(t, filepath)
+  local file, err = io.open(filepath, "wb")
+  if err then return err end
+  file:write("return "..inspect(t))
+  file:close()
+end
+
+local function tab_copy(t)
   local u = { }
   for k, v in pairs(t) do u[k] = v end
   return setmetatable(u, getmetatable(t))
@@ -42,6 +50,13 @@ end
 
 
 -- -------------------------------------------------------------------------
+-- consts
+
+local OFF_ON = {"off", "on"}
+local ON_OFF = {"on", "off"}
+
+
+-- -------------------------------------------------------------------------
 -- state
 
 local gridkeys_modes = {'basic', 'q7'}
@@ -56,7 +71,7 @@ local init_state = {
   active_notes = {},
 }
 
-GRIDKEYS_STATE = table.copy(init_state)
+GRIDKEYS_STATE = tab_copy(init_state)
 
 local function is_gridkeys_on()
   if not GRIDKEYS_STATE.grid_device then
@@ -103,20 +118,23 @@ local gridNbLevels = 15
 local q7_is_affecting = false
 
 local function init_q7gridkeys()
-    GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
+  -- GRIDKEYS_STATE.grid_device.nb_levels = grid_utils.nb_levels(GRIDKEYS_STATE.grid_device)
+  -- q7gridkeys = Q7GridKeys.new(GRIDKEYS_STATE.grid_device.cols,GRIDKEYS_STATE.grid_device.rows)
 
-    q7gridkeys = Q7GridKeys.new(GRIDKEYS_STATE.grid_device.cols,GRIDKEYS_STATE.grid_device.rows)
-    q7gridkeys.id = 1
-    q7gridkeys.midi_device = 1
-    q7gridkeys.midi_channel = 1 -- unused
-    q7gridkeys.sound_mode = 2 -- MIDI
-    q7gridkeys.note_on = q7grid_note_on
-    q7gridkeys.note_off = q7grid_note_off
-    q7gridkeys.key_pushed = q7grid_key_pushed
-    q7gridkeys.layout_mode = q7gridkeys_default_layout_mode
-    -- all_gridSeqs[i] = Q7GridSeq.new(q7gridkeys)
-    -- q7gridkeys.gridSeq = all_gridSeqs[i]
-    -- all_gridSeqs[i].on_pat_changed = gridSeq_pat_changed
+  -- NB: we set dumy values for dimensions & will update them later
+  -- we need to set it to the largest dimesion we would support as `Q7GridKeys` allocates buffers of the size of what we pass it
+  q7gridkeys = Q7GridKeys.new(32, 32)
+  q7gridkeys.id = 1
+  q7gridkeys.midi_device = 1
+  q7gridkeys.midi_channel = 1 -- unused
+  q7gridkeys.sound_mode = 2 -- MIDI
+  q7gridkeys.note_on = q7grid_note_on
+  q7gridkeys.note_off = q7grid_note_off
+  q7gridkeys.key_pushed = q7grid_key_pushed
+  q7gridkeys.layout_mode = q7gridkeys_default_layout_mode
+  -- all_gridSeqs[i] = Q7GridSeq.new(q7gridkeys)
+  -- q7gridkeys.gridSeq = all_gridSeqs[i]
+  -- all_gridSeqs[i].on_pat_changed = gridSeq_pat_changed
 end
 
 local function q7grid_redraw()
@@ -277,6 +295,11 @@ local function set_gridkeys(status)
     return
   end
 
+  if not GRIDKEYS_STATE.grid_device.og_all then
+    print('status='..bool_as_str(status))
+    tab.print(GRIDKEYS_STATE.grid_device)
+  end
+
   GRIDKEYS_STATE.grid_device.og_all(GRIDKEYS_STATE.grid_device, 0)
   GRIDKEYS_STATE.grid_device.og_refresh(GRIDKEYS_STATE.grid_device)
 
@@ -334,8 +357,6 @@ end
 local function init_params()
   params:add_separator("mod_gridkeys", "gridkeys")
 
-  local OFF_ON = {"off", "on"}
-  local ON_OFF = {"on", "off"}
   params:add_option("gridkeys_active", "gridkeys active", OFF_ON,
                     GRIDKEYS_STATE.script_uses_grid and tab.key(OFF_ON, "off") or tab.key(OFF_ON, "on"))
   params:set_action("gridkeys_active",
@@ -350,6 +371,9 @@ local function init_params()
   end}
   params:set_action("gridkeys_grid",
                     function(v)
+                      if not GRIDKEYS_STATE.done_init then
+                        return
+                      end
                       if GRIDKEYS_STATE.grid_device then
                         disable_gridkeys()
                         unassociate_grid(GRIDKEYS_STATE.grid_device)
@@ -459,18 +483,29 @@ end
 -- -------------------------------------------------------------------------
 -- mod lifecycle - init
 
+local function default_conf()
+  local default_conf_file = _path.data .. MOD_NAME .. "/defaults.lua"
+  if util.file_exists(default_conf_file) then
+    return dofile(default_conf_file)
+  end
+  return {}
+end
+
 local function script_init_grid()
-  local i = 1
-  local g = grid.connect(i)
+  local i = params:get("gridkeys_grid")
+  GRIDKEYS_STATE.grid_device = grid.connect(i)
 
-  GRIDKEYS_STATE.grid_device = g
+  -- NB: we always mark it as off explicitely to prevent this porperty persisting after a crash (improper mod `cleanup` call)
+  -- ideally we should not polute each grid object w/ custom fields like that...
+  GRIDKEYS_STATE.grid_device.gridkeys_on = nil
 
-  if not grid_utils.valid(g) then
+  if not grid_utils.valid(GRIDKEYS_STATE.grid_device) then
     print("mod - gridkeys - no grid detected at position "..i)
     return
   end
 
-  snapshot_og_grid_fns(GRIDKEYS_STATE.grid_device)
+  -- snapshot_og_grid_fns(GRIDKEYS_STATE.grid_device)
+  associate_grid(GRIDKEYS_STATE.grid_device)
 
   if GRIDKEYS_STATE.grid_device.key ~= nil then
     print("mod - gridkeys - OFF as grid bound by script")
@@ -493,14 +528,20 @@ mod.hook.register("script_post_init", "gridkeys-script-post-init", function()
                     nb.voice_count = 1
                     nb:init()
 
-                    init_params()
-                    GRIDKEYS_STATE.grid_device = grid.connect(params:get("gridkeys_grid"))
-                    GRIDKEYS_STATE.grid_device.gridkeys_on = nil
+                    local default_conf = default_conf()
+
                     init_q7gridkeys()
+                    init_params()
+
+                    if default_conf['gridkeys_grid'] then
+                      params:set("gridkeys_grid", default_conf['gridkeys_grid'])
+                    end
 
                     script_init_grid()
 
-                    params:set('gridkeys_active', (GRIDKEYS_STATE.script_uses_grid and 1 or 2))
+                    params:set('gridkeys_active', (GRIDKEYS_STATE.script_uses_grid and tab.key(OFF_ON, 'off') or tab.key(OFF_ON, 'on')))
+
+                    GRIDKEYS_STATE.done_init = true
 end)
 
 --- before any script load, restore grid API &
@@ -513,5 +554,6 @@ mod.hook.register("script_post_cleanup", "gridkeys-script-post-cleanup", functio
                         unassociate_grid(g)
                       end
                     end
-                    state = table.copy(init_state)
+                    state = tab_copy(init_state)
+                    GRIDKEYS_STATE.done_init = false
 end)
