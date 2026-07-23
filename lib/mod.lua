@@ -55,6 +55,8 @@ end
 local OFF_ON = {"off", "on"}
 local ON_OFF = {"on", "off"}
 
+local scripts_grid_no_key = { "plasma" }
+
 
 -- -------------------------------------------------------------------------
 -- state
@@ -507,7 +509,9 @@ local function script_init_grid()
   -- snapshot_og_grid_fns(GRIDKEYS_STATE.grid_device)
   associate_grid(GRIDKEYS_STATE.grid_device)
 
-  if GRIDKEYS_STATE.grid_device.key ~= nil then
+  local script_uses_grid_no_key = scripts_grid_no_key[norns.state.name] ~= nil && i == 1
+
+  if GRIDKEYS_STATE.grid_device.key ~= nil or script_uses_grid_no_key then
     print("mod - gridkeys - OFF as grid bound by script")
     GRIDKEYS_STATE.grid_device.og_key = clone_function(GRIDKEYS_STATE.grid_device.key)
     GRIDKEYS_STATE.script_uses_grid = true
