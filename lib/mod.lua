@@ -509,7 +509,7 @@ local function script_init_grid()
   -- snapshot_og_grid_fns(GRIDKEYS_STATE.grid_device)
   associate_grid(GRIDKEYS_STATE.grid_device)
 
-  local script_uses_grid_no_key = scripts_grid_no_key[norns.state.name] ~= nil && i == 1
+  local script_uses_grid_no_key = scripts_grid_no_key[norns.state.name] ~= nil and i == 1
 
   if GRIDKEYS_STATE.grid_device.key ~= nil or script_uses_grid_no_key then
     print("mod - gridkeys - OFF as grid bound by script")
